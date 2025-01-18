@@ -1,214 +1,190 @@
-﻿# **Migrations in Entity Framework**
+﻿# Overriding Conventions in Entity Framework
 
-This document provides an overview of how to use migrations in Entity Framework for different scenarios, including setting up migrations for new and existing databases, adding or modifying classes, handling mistakes, and downgrading a database. Additionally, it explains best practices for naming migrations and describing SQL functions used in migration files.
-
----
-
-## **1. Code First with a New Database**
-
-When creating a new database from scratch using Entity Framework:
-
-### Steps:
-1. Define your models in code (e.g., classes representing entities).
-2. Add a `DbContext` class with `DbSet` properties for each model.
-3. Enable migrations by running the following command in the Package Manager Console:
-   ```shell
-   Enable-Migrations
-   ```
-   This creates a `Migrations` folder with a `Configuration.cs` file.
-4. Create an initial migration:
-   ```shell
-   Add-Migration InitialCreate
-   ```
-   **Naming Convention:**  
-   Use a clear and descriptive name for the migration, such as `InitialCreate`, to indicate that it is the initial migration for the project.
-5. Apply the migration to the database:
-   ```shell
-   Update-Database
-   ```
-6. A new database is created based on your model definitions.
+Entity Framework provides default conventions to map classes and their properties to database schema. However, there are scenarios where these conventions do not fit your requirements, and you need to override them. This can be done using **Data Annotations** or the **Fluent API**.
 
 ---
 
-## **2. Code First with an Existing Database**
+## **1. Overriding Conventions with Data Annotations**
 
-When using an existing database with Entity Framework:
+Data Annotations are attributes that can be applied directly to your model classes and properties to configure the database schema.
 
-### Steps:
-1. Reverse-engineer the database using the `Entity Framework Power Tools` or the `Scaffold-DbContext` command.
-   ```shell
-   Scaffold-DbContext "YourConnectionString" Microsoft.EntityFrameworkCore.SqlServer
-   ```
-2. Enable migrations:
-   ```shell
-   Enable-Migrations
-   ```
-3. Add an initial migration to capture the current state of the database:
-   ```shell
-   Add-Migration InitialDatabaseSync
-   ```
-   **Naming Convention:**  
-   Use names like `InitialDatabaseSync` to signify that this migration aligns the code with the existing database.
-4. Verify the migration script and apply it:
-   ```shell
-   Update-Database
-   ```
+### **Examples**
 
----
+### 1.1 Defining Primary Keys
+By default, Entity Framework considers a property named `Id` or `<ClassName>Id` as the primary key. To explicitly define a primary key:
 
-## **3. Adding a New Class**
-
-When introducing a new entity to the project:
-
-### Steps:
-1. Create a new class representing the entity.
-2. Add a `DbSet` property for the new class in the `DbContext`.
-3. Add a migration to include the new entity:
-   ```shell
-   Add-Migration AddNewEntityName
-   ```
-   **Naming Convention:**  
-   Use a name like `AddProductTable` or `AddOrderDetailsEntity` to clearly describe the added entity.
-4. Apply the migration:
-   ```shell
-   Update-Database
-   ```
-
----
-
-## **4. Modifying an Existing Class**
-
-When changing the structure of an existing entity (e.g., adding, removing, or renaming properties):
-
-### Steps:
-1. Update the class definition with the desired changes.
-2. Add a migration:
-   ```shell
-   Add-Migration UpdateEntityNameOrPropertyChange
-   ```
-   **Naming Convention:**  
-   Use a name like `AddPriceColumnToProducts` or `RenameCustomerNameToFullName` to reflect the modification.
-3. Apply the migration:
-   ```shell
-   Update-Database
-   ```
-
----
-
-## **5. Deleting an Existing Class**
-
-When removing an entity from the project:
-
-### Steps:
-1. Delete the class file.
-2. Remove the corresponding `DbSet` property from the `DbContext`.
-3. Add a migration:
-   ```shell
-   Add-Migration RemoveEntityName
-   ```
-   **Naming Convention:**  
-   Use a name like `RemoveProductTable` to clearly indicate what is being deleted.
-4. Apply the migration:
-   ```shell
-   Update-Database
-   ```
-
----
-
-## **6. Recovery from a Mistake**
-
-If a mistake occurs during the migration process:
-
-### Steps:
-1. Roll back the database to the previous migration:
-   ```shell
-   Update-Database -TargetMigration PreviousMigrationName
-   ```
-2. Correct the mistake in the code or migration file.
-3. Generate a new migration if necessary:
-   ```shell
-   Add-Migration CorrectedMigration
-   ```
-4. Apply the corrected migration:
-   ```shell
-   Update-Database
-   ```
-
----
-
-## **7. Migrations Downgrading a Database**
-
-To downgrade a database to a previous state:
-
-### Steps:
-1. Identify the target migration:
-   ```shell
-   Get-Migrations
-   ```
-2. Roll back to the target migration:
-   ```shell
-   Update-Database -TargetMigration TargetMigrationName
-   ```
-
-### Example:
-If you want to downgrade to the initial migration:
-```shell
-Update-Database -TargetMigration InitialCreate
-```
-
----
-
-## **8. Adding SQL Functions in Migration Files**
-
-If your migration requires SQL functions, you can include custom SQL code in the migration file.
-
-### Steps:
-1. Open the generated migration file in the `Migrations` folder.
-2. Use the `Sql` method inside the `Up` and `Down` methods to execute raw SQL commands.
-
-### Example:
 ```csharp
-protected override void Up(MigrationBuilder migrationBuilder)
-{
-    migrationBuilder.Sql("CREATE FUNCTION GetCustomerOrders (@CustomerId INT) RETURNS TABLE AS RETURN (SELECT * FROM Orders WHERE CustomerId = @CustomerId)");
-}
+using System.ComponentModel.DataAnnotations;
 
-protected override void Down(MigrationBuilder migrationBuilder)
+public class Product
 {
-    migrationBuilder.Sql("DROP FUNCTION IF EXISTS GetCustomerOrders");
+    [Key]
+    public int ProductCode { get; set; }
+    public string Name { get; set; }
 }
 ```
 
-**Best Practice:**  
-- Always include corresponding `Down` logic to revert changes made by the `Up` method.
+### 1.2 Setting Column Names
+Override the default column name using the `Column` attribute:
+
+```csharp
+using System.ComponentModel.DataAnnotations.Schema;
+
+public class Product
+{
+    public int Id { get; set; }
+
+    [Column("Product_Name")]
+    public string Name { get; set; }
+}
+```
+
+### 1.3 Defining String Length
+Control the maximum length of a string field using the `MaxLength` or `StringLength` attributes:
+
+```csharp
+public class Product
+{
+    public int Id { get; set; }
+
+    [MaxLength(100)]
+    public string Name { get; set; }
+}
+```
+
+### 1.4 Ignoring Properties
+Exclude a property from mapping using the `NotMapped` attribute:
+
+```csharp
+public class Product
+{
+    public int Id { get; set; }
+
+    [NotMapped]
+    public string TempData { get; set; }
+}
+```
+
+### 1.5 Configuring Relationships
+Specify relationships between entities using attributes such as `ForeignKey`:
+
+```csharp
+public class Order
+{
+    public int Id { get; set; }
+
+    [ForeignKey("ProductId")]
+    public Product Product { get; set; }
+    public int ProductId { get; set; }
+}
+```
 
 ---
 
-## **Tips and Best Practices**
+## **2. Overriding Conventions with Fluent API**
 
-- **Naming Migrations:**  
-  Use clear and concise names that describe the purpose of the migration, such as `AddNewColumnToOrders` or `UpdateUserSchema`.
+The Fluent API provides a more powerful and flexible way to configure the database schema. Configurations are applied in the `OnModelCreating` method of the `DbContext` class.
 
-- **Deleting a Model:**  
-    - create migration to delete first the relations
-    - create migration to save the data exists in the table
-    - dorp the table
-- **Recovery from mistakes:**  
-    Migrations like git commits we can't update it but we create new one.
+### **Examples**
 
-- **Review Migration Files:**  
-  Always review the generated migration files for correctness before applying them.
+### 2.1 Defining Primary Keys
 
-- **Source Control:**  
-  Commit migration files to version control to track database changes.
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Product>()
+        .HasKey(p => p.ProductCode);
+}
+```
 
-- **Staging Environment:**  
-  Test migrations in a staging environment before deploying to production.
+### 2.2 Setting Column Names
 
-- **Model-Database Sync:**  
-  Ensure that your models and database schema remain in sync to avoid runtime errors.
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Product>()
+        .Property(p => p.Name)
+        .HasColumnName("Product_Name");
+}
+```
+
+### 2.3 Configuring Column Types and Length
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Product>()
+        .Property(p => p.Name)
+        .HasMaxLength(100)
+        .HasColumnType("nvarchar");
+}
+```
+
+### 2.4 Ignoring Properties
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Product>()
+        .Ignore(p => p.TempData);
+}
+```
+
+### 2.5 Configuring Relationships
+#### One-to-Many Relationship
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Order>()
+        .HasOne(o => o.Product)
+        .WithMany(p => p.Orders)
+        .HasForeignKey(o => o.ProductId);
+}
+```
+
+#### Many-to-Many Relationship
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<ProductCategory>()
+        .HasKey(pc => new { pc.ProductId, pc.CategoryId });
+
+    modelBuilder.Entity<ProductCategory>()
+        .HasOne(pc => pc.Product)
+        .WithMany(p => p.ProductCategories)
+        .HasForeignKey(pc => pc.ProductId);
+
+    modelBuilder.Entity<ProductCategory>()
+        .HasOne(pc => pc.Category)
+        .WithMany(c => c.ProductCategories)
+        .HasForeignKey(pc => pc.CategoryId);
+}
+```
 
 ---
 
-With these steps and practices, you can effectively manage migrations in Entity Framework while maintaining a clear and traceable history of database changes.
+## **Comparison: Data Annotations vs Fluent API**
+
+| Feature                  | Data Annotations                     | Fluent API                          |
+|--------------------------|---------------------------------------|--------------------------------------|
+| **Ease of Use**          | Simple and intuitive for basic tasks | More verbose, suitable for advanced configurations |
+| **Configuration Scope**  | Limited to attributes                | Provides full control over configuration |
+| **Maintainability**      | Directly tied to model classes       | Centralized in `OnModelCreating`    |
+| **Advanced Features**    | Not supported                        | Supports complex mappings            |
+
+---
+
+## **Best Practices**
+
+1. Use Data Annotations for simple configurations, such as string length or renaming columns.
+2. Use the Fluent API for advanced configurations and relationships.
+3. Maintain consistency: avoid mixing Data Annotations and Fluent API for the same property.
+4. Keep the `OnModelCreating` method organized by grouping configurations logically.
+5. Always test your configurations in a staging environment before applying to production.
+
+---
+
+With these tools, you can tailor your database schema to meet your specific requirements, ensuring both flexibility and maintainability in your application.
 
